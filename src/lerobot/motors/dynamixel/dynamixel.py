@@ -21,6 +21,7 @@
 import logging
 from copy import deepcopy
 from enum import Enum
+from pprint import pformat
 
 from lerobot.motors.encoding_utils import decode_twos_complement, encode_twos_complement
 
@@ -60,7 +61,7 @@ class OperatingMode(Enum):
 
     # This mode controls position. This mode is identical to the Multi-turn Position Control from existing
     # DYNAMIXEL. 512 turns are supported(-256[rev] ~ 256[rev]). This mode is ideal for multi-turn wrists or
-    # conveyor systems or a system that requires an additional reduction gear. Note that Max Position
+    # conveyer systems or a system that requires an additional reduction gear. Note that Max Position
     # Limit(48), Min Position Limit(52) are not used on Extended Position Control Mode.
     EXTENDED_POSITION = 4
 
@@ -192,12 +193,14 @@ class DynamixelMotorsBus(MotorsBus):
 
     def write_calibration(self, calibration_dict: dict[str, MotorCalibration], cache: bool = True) -> None:
         for motor, calibration in calibration_dict.items():
+            print(f"Writing calibration for motor '{motor}': {calibration}")
             self.write("Homing_Offset", motor, calibration.homing_offset)
             self.write("Min_Position_Limit", motor, calibration.range_min)
             self.write("Max_Position_Limit", motor, calibration.range_max)
 
         if cache:
             self.calibration = calibration_dict
+            print(f"CALIBRATION: {self.calibration}")
 
     def disable_torque(self, motors: str | list[str] | None = None, num_retry: int = 0) -> None:
         for motor in self._get_motors_list(motors):
@@ -262,3 +265,56 @@ class DynamixelMotorsBus(MotorsBus):
             return
 
         return {id_: data[0] for id_, data in data_list.items()}
+
+    def _assert_motors_exist(self) -> None:
+        expected_models = {m.id: self.model_number_table[m.model] for m in self.motors.values()}
+
+        found_models = {}
+        if not self.port_handler.is_open:
+            if self.port_handler.openPort():
+                print("Succeeded to open the port")
+            else:
+                print("Failed to open the port")
+                print("Press any key to terminate...")
+                input()
+                return None
+        if not self.port_handler.setBaudRate(self.default_baudrate):
+            print("Failed to set baudrate")
+            return None
+        dxl_data_list, dxl_comm_result = self.packet_handler.broadcastPing(self.port_handler)
+
+        for id_ in self.ids:
+            model_nb = self.ping(id_)
+            if model_nb is not None:
+                found_models[id_] = dxl_data_list[id_][0]
+
+        missing_ids = [id_ for id_ in self.ids if id_ not in found_models]
+        wrong_models = {
+            id_: (expected_models[id_], found_models[id_])
+            for id_ in found_models
+            if expected_models.get(id_) != found_models[id_]
+        }
+
+        if missing_ids or wrong_models:
+            error_lines = [f"{self.__class__.__name__} motor check failed on port '{self.port}':"]
+
+            if missing_ids:
+                error_lines.append("\nMissing motor IDs:")
+                error_lines.extend(
+                    f"  - {id_} (expected model: {expected_models[id_]})" for id_ in missing_ids
+                )
+
+            if wrong_models:
+                error_lines.append("\nMotors with incorrect model numbers:")
+                error_lines.extend(
+                    f"  - {id_} ({self._id_to_name(id_)}): expected {expected}, found {found}"
+                    for id_, (expected, found) in wrong_models.items()
+                )
+
+            error_lines.append("\nFull expected motor list (id: model_number):")
+            error_lines.append(pformat(expected_models, indent=4, sort_dicts=False))
+            error_lines.append("\nFull found motor list (id: model_number):")
+            error_lines.append(pformat(found_models, indent=4, sort_dicts=False))
+
+            raise RuntimeError("\n".join(error_lines))
+        print(f"Found all motors: {found_models}")

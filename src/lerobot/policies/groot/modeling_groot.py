@@ -49,7 +49,7 @@ class GrootPolicy(PreTrainedPolicy):
     name = "groot"
     config_class = GrootConfig
 
-    def __init__(self, config: GrootConfig, **kwargs):
+    def __init__(self, config: GrootConfig):
         """Initialize Groot policy wrapper."""
         super().__init__(config)
         config.validate_features()

@@ -29,24 +29,12 @@ from torch import Tensor
 
 from lerobot.configs.types import FeatureType, PolicyFeature
 from lerobot.envs.configs import EnvConfig
-from lerobot.utils.constants import OBS_ENV_STATE, OBS_IMAGE, OBS_IMAGES, OBS_STATE, OBS_STR
+from lerobot.utils.constants import OBS_ENV_STATE, OBS_IMAGE, OBS_IMAGES, OBS_STATE
 from lerobot.utils.utils import get_channel_first_image_shape
 
 
-def _convert_nested_dict(d):
-    result = {}
-    for k, v in d.items():
-        if isinstance(v, dict):
-            result[k] = _convert_nested_dict(v)
-        elif isinstance(v, np.ndarray):
-            result[k] = torch.from_numpy(v)
-        else:
-            result[k] = v
-    return result
-
-
 def preprocess_observation(observations: dict[str, np.ndarray]) -> dict[str, Tensor]:
-    # TODO(jadechoghari, imstevenpmwork): refactor this to use features from the environment (no hardcoding)
+    # TODO(aliberts, rcadene): refactor this to use features from the environment (no hardcoding)
     """Convert environment observation to LeRobot format observation.
     Args:
         observation: Dictionary of observation batches from a Gym vector environment.
@@ -90,27 +78,17 @@ def preprocess_observation(observations: dict[str, np.ndarray]) -> dict[str, Ten
 
         return_observations[OBS_ENV_STATE] = env_state
 
-    if "agent_pos" in observations:
-        agent_pos = torch.from_numpy(observations["agent_pos"]).float()
-        if agent_pos.dim() == 1:
-            agent_pos = agent_pos.unsqueeze(0)
-        return_observations[OBS_STATE] = agent_pos
-
-    if "robot_state" in observations:
-        return_observations[f"{OBS_STR}.robot_state"] = _convert_nested_dict(observations["robot_state"])
-
-    # Handle IsaacLab Arena format: observations have 'policy' and 'camera_obs' keys
-    if "policy" in observations:
-        return_observations[f"{OBS_STR}.policy"] = observations["policy"]
-
-    if "camera_obs" in observations:
-        return_observations[f"{OBS_STR}.camera_obs"] = observations["camera_obs"]
+    # TODO(rcadene): enable pixels only baseline with `obs_type="pixels"` in environment by removing
+    agent_pos = torch.from_numpy(observations["agent_pos"]).float()
+    if agent_pos.dim() == 1:
+        agent_pos = agent_pos.unsqueeze(0)
+    return_observations[OBS_STATE] = agent_pos
 
     return return_observations
 
 
 def env_to_policy_features(env_cfg: EnvConfig) -> dict[str, PolicyFeature]:
-    # TODO(jadechoghari, imstevenpmwork): remove this hardcoding of keys and just use the nested keys as is
+    # TODO(aliberts, rcadene): remove this hardcoding of keys and just use the nested keys as is
     # (need to also refactor preprocess_observation and externalize normalization from policies)
     policy_features = {}
     for key, ft in env_cfg.features.items():
@@ -310,7 +288,7 @@ def _import_hub_module(local_file: str, repo_id: str) -> Any:
     return module
 
 
-def _call_make_env(module: Any, n_envs: int, use_async_envs: bool, cfg: EnvConfig | None) -> Any:
+def _call_make_env(module: Any, n_envs: int, use_async_envs: bool) -> Any:
     """
     Ensure module exposes make_env and call it.
     """
@@ -319,11 +297,7 @@ def _call_make_env(module: Any, n_envs: int, use_async_envs: bool, cfg: EnvConfi
             f"The hub module {getattr(module, '__name__', 'hub_module')} must expose `make_env(n_envs=int, use_async_envs=bool)`."
         )
     entry_fn = module.make_env
-    # Only pass cfg if it's not None (i.e., when an EnvConfig was provided, not a string hub ID)
-    if cfg is not None:
-        return entry_fn(n_envs=n_envs, use_async_envs=use_async_envs, cfg=cfg)
-    else:
-        return entry_fn(n_envs=n_envs, use_async_envs=use_async_envs)
+    return entry_fn(n_envs=n_envs, use_async_envs=use_async_envs)
 
 
 def _normalize_hub_result(result: Any) -> dict[str, dict[int, gym.vector.VectorEnv]]:
