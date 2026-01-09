@@ -41,10 +41,11 @@ from lerobot.robots import (  # noqa: F401
     RobotConfig,
     koch_follower,
     make_robot_from_config,
-    so_follower,
+    so100_follower,
+    so101_follower,
 )
 from lerobot.utils.constants import ACTION
-from lerobot.utils.robot_utils import precise_sleep
+from lerobot.utils.robot_utils import busy_wait
 from lerobot.utils.utils import (
     init_logging,
     log_say,
@@ -96,7 +97,7 @@ def replay(cfg: ReplayConfig):
         robot.send_action(action)
 
         dt_s = time.perf_counter() - start_episode_t
-        precise_sleep(max(1 / dataset.fps - dt_s, 0.0))
+        busy_wait(1 / dataset.fps - dt_s)
 
     robot.disconnect()
 
