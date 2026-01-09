@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2024 The HuggingFace Inc. team. All rights reserved.
+# Copyright 2025 The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,20 +14,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
-
-from ..config import TeleoperatorConfig
-
-
-@TeleoperatorConfig.register_subclass("keyboard")
-@dataclass
-class KeyboardTeleopConfig(TeleoperatorConfig):
-    """KeyboardTeleopConfig"""
-
-    # TODO(Steven): Consider setting in here the keys that we want to capture/listen
-
-
-@TeleoperatorConfig.register_subclass("keyboard_ee")
-@dataclass
-class KeyboardEndEffectorTeleopConfig(KeyboardTeleopConfig):
-    use_gripper: bool = True
+from .config_so100_leader import SO100LeaderConfig
+from .so100_leader import SO100Leader

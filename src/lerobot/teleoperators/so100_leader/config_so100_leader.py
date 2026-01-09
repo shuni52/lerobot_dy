@@ -19,15 +19,8 @@ from dataclasses import dataclass
 from ..config import TeleoperatorConfig
 
 
-@TeleoperatorConfig.register_subclass("keyboard")
+@TeleoperatorConfig.register_subclass("so100_leader")
 @dataclass
-class KeyboardTeleopConfig(TeleoperatorConfig):
-    """KeyboardTeleopConfig"""
-
-    # TODO(Steven): Consider setting in here the keys that we want to capture/listen
-
-
-@TeleoperatorConfig.register_subclass("keyboard_ee")
-@dataclass
-class KeyboardEndEffectorTeleopConfig(KeyboardTeleopConfig):
-    use_gripper: bool = True
+class SO100LeaderConfig(TeleoperatorConfig):
+    # Port to connect to the arm
+    port: str
